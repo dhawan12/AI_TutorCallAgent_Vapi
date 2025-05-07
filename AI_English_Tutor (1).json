@@ -1,0 +1,267 @@
+{
+  "name": "AI English Tutor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "englishtutor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        20,
+        160
+      ],
+      "id": "cc1f7731-8f57-42d5-b6fd-ac55ab599909",
+      "name": "Webhook",
+      "webhookId": "6d79f170-bc77-443a-8fc3-4e04412168ae"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"results\": [\n    {\n      \"toolCallId\": \"$('Webhook').item.json.body.message.toolCallList[0].id\",\n      \"result\": \"JSON.stringify($json.output)\"\n    }\n  ]\n}\n",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        160
+      ],
+      "id": "3b400482-c4bd-4a7d-8c68-a36ca82864d2",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.message.artifact.messages",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        240,
+        160
+      ],
+      "id": "769d91d1-255f-422c-9580-5f0bdfbb7e20",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "message"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        460,
+        160
+      ],
+      "id": "36c85aa7-73b1-46dc-8cac-dde47543eae7",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# User Transcript\n{{ $json.message[0] }} -> Containing all the information about the user's name, level and English level, Session Information and booking time.",
+        "options": {
+          "systemMessage": "=# Role\nYou are an experienced AI Appointment Setter working with Vapi English Academy.\n\n# Task\n1. When a user requests a time, first confirm the details:\n   \"You requested [day] at [time]. That would be [YYYY-MM-DD at HH:MM]. Is this correct?\"\n\n2. After confirmation, use the \"CheckAvailability\" tool to verify the slot is available.\n\n3. If the slot is available:\n   - Use the \"BookAppointment\" tool to confirm\n   - Return: \"Awesome! Your appointment with Neo has been booked for [YYYY-MM-DD at HH:MM]. We look forward to connecting with you then!\"\n\n4. If no slot is available:\n   \"I'm sorry, but [YYYY-MM-DD at HH:MM] is not available. Would you like me to check for other times near your requested slot?\"\n\n5. If user asks for a new time, repeat the process.\n\n# Notes\n- Use the exact date/time provided by the user unless they ask for \"now\" or \"current time\"\n- Strictly use ISO 8601 format (YYYY-MM-DDTHH:MM:SS+ZZ:ZZ) for all tool calls\n- Verify all dates are in the current/future (never past dates)"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        680,
+        160
+      ],
+      "id": "83ec4bf9-58fa-466f-9ea6-7b0724bec1c3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        640,
+        360
+      ],
+      "id": "f2d70b2f-70ca-4b5b-84c3-0ffc975d657e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GkqNLGxP1KU0Z83d",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "namadhawan@gmail.com",
+          "mode": "list",
+          "cachedResultName": "namadhawan@gmail.com"
+        },
+        "timeMin": "={{ $fromAI('Start_Time', `Extract the exact start time provided by the user`, 'string') }}",
+        "timeMax": "={{ $fromAI('End_Time', `Calculate end time as 10 minutes after the user-provided start time`, 'string') }}",
+        "options": {
+          "timezone": {
+            "__rl": true,
+            "value": "Asia/Kolkata",
+            "mode": "list",
+            "cachedResultName": "Asia/Kolkata"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        780,
+        480
+      ],
+      "id": "6ceb7535-9256-4279-a850-881e973ee385",
+      "name": "CheckAvailability",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "NZzLGkqgL01Zm0Zq",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "namadhawan@gmail.com",
+          "mode": "list",
+          "cachedResultName": "namadhawan@gmail.com"
+        },
+        "start": "={{ $fromAI('Start', `When user wants to shedue the next call`, 'string') }}",
+        "end": "={{ $fromAI('End', `Assume the end time is 10 minutes after the start time  `, 'string') }}",
+        "additionalFields": {
+          "summary": "10 Minute Voice Call for Pratice  "
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        980,
+        480
+      ],
+      "id": "84fa86bc-fa21-4246-9274-67d872214d20",
+      "name": "BookAppointment",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "NZzLGkqgL01Zm0Zq",
+          "name": "Google Calendar account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckAvailability": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BookAppointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "e10f9e77-03e6-4829-88af-57ffc27b89ec",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0f16f6be955dfa47d54e369bb86a24ccafc0e4c9c43278c266efd0e058f0e364"
+  },
+  "id": "W4WFNs77DWdWuS6j",
+  "tags": []
+}
